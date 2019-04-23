@@ -1,0 +1,36 @@
+groups:
+- name: Container_CPU_Alert
+  rules:
+  - alert: task_high_cpu_50
+    expr: sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_swarm_task_name=~".+"}[1m]))
+      BY (container_label_com_docker_swarm_task_name, instance) * 100 > 50
+    for: 3m
+    labels:
+      severity: warning
+    annotations:
+      description: High CPU consumption on '{{ $labels.container_label_com_docker_swarm_task_name }}' on '{{ $labels.instance }}'  CPU usage is at '{{ humanize
+        $value}}%.'
+      summary: CPU alert for Swarm container '{{ $labels.container_label_com_docker_swarm_task_name }}'
+- name: Container_Memory_Alert
+  rules:
+  - alert: task_high_memory_2g
+    expr: sum(container_memory_rss{container_label_com_docker_swarm_task_name=~".+"})
+      BY (container_label_com_docker_swarm_task_name, instance) > 2e+09
+    for: 3m
+    labels:
+      severity: warning
+    annotations:
+      description: High Memory comsumption on '{{ $labels.container_label_com_docker_swarm_task_name }}' on '{{ $labels.instance }}' memory taken up is '{{ humanize
+        $value}}.'
+      summary: Memory alert for Swarm service '{{ $labels.container_label_com_docker_swarm_task_name }}'
+- name: Container_Space_Usage_Alert
+  rules:
+  - alert: task_high_space_usage_10g
+    expr: sum(container_fs_writes_bytes_total{container_label_com_docker_swarm_node_id=~".+", id=~"/docker/.*"}) BY (container_label_com_docker_swarm_task_name, instance) > 10565134830
+    for: 3m
+    labels:
+      severity: warning
+    annotations:
+      description: High Volume usage on '{{ $labels.container_label_com_docker_swarm_task_name }}' on '{{ $labels.instance }}' space occupied is '{{ humanize
+        $value}}.'
+      summary: Volume alert for Swarm service '{{ $labels.container_label_com_docker_swarm_task_name }}'

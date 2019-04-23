@@ -1,0 +1,20 @@
+global:
+  hipchat_api_url: 'HIPCHAT_URL'
+  http_config:
+   proxy_url: 'PROXY_URL' 
+
+route:
+  group_by: [alertname]
+  repeat_interval: 1m
+  receiver: hipchat
+
+receivers:
+    - name: hipchat
+      hipchat_configs:
+        - send_resolved: true
+          #auth_token: <hipchat_auth_token>#
+          #room_id: <hipchat_room_id>#
+          notify: true
+          message_format: html
+          message: '{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}'
+

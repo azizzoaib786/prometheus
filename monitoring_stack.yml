@@ -1,0 +1,104 @@
+version: '3.3'
+
+networks:
+  vl:
+    external: true
+
+configs:
+  prometheus_yml:
+    file: ./prometheus.yml
+  alertrules_yml:
+    file: ./alert_rules.rules.yml
+
+services:
+  cadvisor:
+    image: google/cadvisor:latest
+    volumes:
+      - /sys:/sys
+      - /:/rootfs
+      - /var/run:/var/run
+      - /var/lib/docker:/var/lib/docker
+    networks:
+      - vl
+    deploy:
+      mode: global
+
+  node-exporter:
+    image: azizzoaib/node-exporter:latest
+    volumes:
+      - /proc:/host/proc
+      - /sys:/host/sys
+      - /:/rootfs
+      - /etc/hostname:/etc/nodename
+    environment:
+      - NODE_ID={{.Node.ID}}
+    networks:
+      - vl
+    deploy:
+      mode: global
+    command:
+      - '--path.sysfs=/host/sys'
+      - '--path.procfs=/host/proc'
+      - '--collector.textfile.directory=/etc/node-exporter/'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--no-collector.ipvs'
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - '9090:9090'
+    configs:
+      - source: prometheus_yml
+        target: /etc/prometheus/prometheus.yml
+      - source: alertrules_yml
+        target: /etc/prometheus/alert_rules.rules.yml 
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention=24h'
+    volumes:
+      - /mnt/gluster/prometheus/prometheus:/prometheus:rw
+    networks:
+      - vl
+    deploy:
+      mode: replicated
+      replicas: 1
+    depends_on:
+      - cadvisor
+
+  grafana:
+    image: azizzoaib/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - /mnt/gluster/prometheus/grafana:/var/lib/grafana:rw
+    networks:
+      - vl
+    deploy:
+      mode: replicated
+      replicas: 1
+    depends_on:
+      - prometheus
+
+  alertmanager:
+    image: azizzoaib/alertmanager:latest
+    volumes:
+      - /mnt/gluster/prometheus/alertmanager:/alertmanager:rw
+    networks:
+      - vl
+    environment:
+      - auth_token: ${hipchat_auth_token}
+      - room_id: ${hipchat_room_id}
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--log.level=debug'
+    ports:
+      - '9093:9093'
+    deploy:
+      mode: replicated
+      replicas: 1
+    depends_on:
+      - prometheus
